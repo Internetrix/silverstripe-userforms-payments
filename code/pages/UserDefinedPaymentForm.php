@@ -471,7 +471,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
  *
  * @package userforms
  */
-class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends UserDefinedForm_SubmittedFormEmail
+class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends UserFormRecipientEmail
 {
 
     protected $ss_template = "SubmittedPaymentFormEmail";
