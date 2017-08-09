@@ -5,6 +5,12 @@
  *
  * @package userforms-payments
  */
+
+use SilverStripe\Omnipay\GatewayFieldsFactory;
+use SilverStripe\Omnipay\GatewayInfo;
+use SilverStripe\Omnipay\Service\PurchaseService;
+use SilverStripe\Omnipay\Service\ServiceResponse;
+
 class UserDefinedPaymentForm extends UserDefinedForm
 {
     private static $description = 'A user defined form page that accepts payments';
@@ -311,7 +317,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
 
 	    // Initiate payment, get the result back
 	    try {
-		    $serviceResponse = $service->initiate($this->getGatewayData($postdata));
+		    $serviceResponse = $service->initiate($postdata);
 	    } catch (SilverStripe\Omnipay\Exception\Exception $ex) {
 		    // error out when an exception occurs
 		    $this->error($ex->getMessage());
@@ -353,7 +359,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
             Session::set('userformssubmission' . $this->ID, $submittedForm->ID);
         }
 //die();
-        return $serviceResponse;
+        return $serviceResponse->redirectOrRespond();
     }
 
     /**
@@ -499,6 +505,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
             }
         }
     }
+
 }
 
 
