@@ -15,6 +15,6 @@
     ],
     "require": {
         "silverstripe/userforms": ">=4.4.0",
-        "burnbright/silverstripe-omnipay": "^2.1"
+		"silverstripe/silverstripe-omnipay" : "^2.1"
     }
 }
