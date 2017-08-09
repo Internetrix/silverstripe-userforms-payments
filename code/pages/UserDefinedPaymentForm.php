@@ -59,6 +59,21 @@ class UserDefinedPaymentForm extends UserDefinedForm
 
         return $fields;
     }
+
+	/**
+	 * @return ArrayList
+	 */
+	public function FilteredEmailRecipients($data = null, $form = null, $status = null)
+	{
+		$recipients = parent::FilteredEmailRecipients($data, $form);
+
+		// @todo - rework in the original logic so extensions can manipulate this recipients list
+		$recipients = $recipients->filterByCallback(function ($item, $list) use ($status) {
+			return $item->SendForStatus($status);
+		});
+
+		return $recipients;
+	}
 }
 
 class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
@@ -92,18 +107,35 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         return $fields;
     }
 
-    /**
+	/**
+	 * Get the form for the page. Form can be modified by calling {@link updateForm()}
+	 * on a UserDefinedForm extension.
+	 *
+	 * @return Forms
+	 */
+	public function Form()
+	{
+		$form = UserForm::create($this);
+		$form->setFields($this->getFormFields($form));
+		$this->generateConditionalJavascript();
+		return $form;
+	}
+
+
+	/**
      * Combine all the parent UserDefinedForm fields and the omnipay fields
      *
      * @return FieldList
      */
-    public function getFormFields()
+    public function getFormFields(Form $form)
     {
         $gateway     = $this->data()->PaymentGateway;
         $fieldgroups = $this->getPaymentFieldsGroupArray();
         $factory     = new GatewayFieldsFactory($gateway, $fieldgroups);
-        $fields      = parent::getFormFields();
+        $fields      = $form->Fields();
         $fields->add(CompositeField::create($factory->getFields())->addExtraClass($gateway . "_fields"));
+
+//	    Debug::show($factory->getFields()); die();
 
         if ($address1 = $fields->fieldByName('billingAddress1')) $address1->setTitle("Address Line 1");
         if ($address2 = $fields->fieldByName('billingAddress2')) $address2->setTitle("Address Line 2");
@@ -261,14 +293,30 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         $amount           = $data[$paymentfieldname];
         $postdata         = $data;
 
+	    Debug::show($postdata);
+
         // request payment
         $payment = Payment::create()->init($this->data()->PaymentGateway, $amount, $currency);
+	    $payment->setSuccessUrl($this->Link('finished') . $referrer);
+	    $payment->setFailureUrl($this->Link('finished') . $referrer);
+
         $payment->write();
 
-        $response = PurchaseService::create($payment)
-            ->setReturnUrl($this->Link('finished') . $referrer)
-            ->setCancelUrl($this->Link('finished') . $referrer)
-            ->purchase($postdata);
+        $service = PurchaseService::create($payment);
+//            ->setReturnUrl($this->Link('finished') . $referrer)
+//            ->setCancelUrl($this->Link('finished') . $referrer)
+//            ->purchase($postdata);
+//
+//	    Debug::show($response);
+
+	    // Initiate payment, get the result back
+	    try {
+		    $serviceResponse = $service->initiate($this->getGatewayData($postdata));
+	    } catch (SilverStripe\Omnipay\Exception\Exception $ex) {
+		    // error out when an exception occurs
+		    $this->error($ex->getMessage());
+		    return null;
+	    }
 
         // save payment to order
         $submittedForm->PaymentID = $payment->ID;
@@ -304,8 +352,8 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         if (!$this->DisableSaveSubmissions) {
             Session::set('userformssubmission' . $this->ID, $submittedForm->ID);
         }
-
-        return $response->redirect();
+//die();
+        return $serviceResponse;
     }
 
     /**
@@ -328,7 +376,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
                 // @todo get $attachments from submission
                 $attachments = array();
 
-                if ($recipients = $this->FilteredEmailRecipients($payment_status)) {
+                if ($recipients = $this->FilteredEmailRecipients(null, null, $payment_status)) {
                     $this->SendEmailsToRecipients($recipients, $attachments, $submittedFields, $payment);
                 }
             }
@@ -364,18 +412,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         ));
     }
 
-    /**
-     * @return ArrayList
-     */
-    public function FilteredEmailRecipients($status = null)
-    {
-        // @todo - rework in the original logic so extensions can manipulate this recipients list
-        $recipients = $this->getComponents('EmailRecipients')->filterByCallback(function ($item, $list) use ($status) {
-            return $item->SendForStatus($status);
-        });
 
-        return $recipients;
-    }
 
 
     /**
