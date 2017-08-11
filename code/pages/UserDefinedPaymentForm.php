@@ -39,7 +39,7 @@ class UserDefinedPaymentForm extends UserDefinedForm
     public function getCMSFields()
     {
         $fields       = parent::getCMSFields();
-        $gateways     = GatewayInfo::get_supported_gateways();
+        $gateways     = GatewayInfo::getSupportedGateways();
         $amountfields = $this->Fields()->map("ID", "Title");
         $fields->addFieldsToTab("Root.Payment",
             array(
