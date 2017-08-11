@@ -63,6 +63,8 @@ class UserDefinedPaymentForm extends UserDefinedForm
         $onErrorFieldSet->addExtraClass('field');
         $fields->insertAfter($onErrorFieldSet, "OnCompleteMessage");
 
+	    $this->extend('updateUserDefinedPaymentFormCMSFields', $fields);
+
         return $fields;
     }
 
@@ -406,6 +408,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         }
         // remove the session variable as we do not want it to be re-used
         Session::clear('FormProcessed');
+	    Session::clear('userformssubmission' . $this->ID);
         $successmessage = str_replace("[amount]", $amountnice, $this->data()->OnCompleteMessage);
         return $this->customise(array(
             'Content' => $this->customise(array(
@@ -414,7 +417,8 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
                 'OnSuccessMessage' => $successmessage,
                 'AmountNice'       => $amountnice
             ))->renderWith('ReceivedPaymentFormSubmission'),
-            'Form'    => ($payment_status=="Captured")?'':$this->Form()
+            'Form'      => ($payment_status=="Captured")?'':$this->Form(),
+	        'IsFinished'  => true
         ));
     }
 
