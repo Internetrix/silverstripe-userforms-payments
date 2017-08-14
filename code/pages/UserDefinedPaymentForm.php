@@ -194,31 +194,6 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         Session::set("FormInfo.{$form->FormName()}.data", $data);
         Session::clear("FormInfo.{$form->FormName()}.errors");
 
-        foreach ($this->Fields() as $field) {
-            $messages[$field->Name] = $field->getErrorMessage()->HTML();
-            $formField              = $field->getFormField();
-
-            if ($field->Required && $field->CustomRules()->Count() == 0) {
-                if (isset($data[$field->Name])) {
-                    $formField->setValue($data[$field->Name]);
-                }
-
-                if (
-                    !isset($data[$field->Name]) ||
-                    !$data[$field->Name] ||
-                    !$formField->validate($form->getValidator())
-                ) {
-                    $form->addErrorMessage($field->Name, $field->getErrorMessage(), 'bad');
-                }
-            }
-        }
-
-        if (Session::get("FormInfo.{$form->FormName()}.errors")) {
-            Controller::curr()->redirectBack();
-
-            return;
-        }
-
         // if there are no errors, create the payment
         $submittedForm                = Object::create('SubmittedPaymentForm');
         $submittedForm->SubmittedByID = ($id = Member::currentUserID()) ? $id : 0;
@@ -301,8 +276,6 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         $amount           = $data[$paymentfieldname];
         $postdata         = $data;
 
-	    Debug::show($postdata);
-
         // request payment
         $payment = Payment::create()->init($this->data()->PaymentGateway, $amount, $currency);
 	    $payment->setSuccessUrl($this->Link('finished') . $referrer);
@@ -311,11 +284,6 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         $payment->write();
 
         $service = PurchaseService::create($payment);
-//            ->setReturnUrl($this->Link('finished') . $referrer)
-//            ->setCancelUrl($this->Link('finished') . $referrer)
-//            ->purchase($postdata);
-//
-//	    Debug::show($response);
 
 	    // Initiate payment, get the result back
 	    try {
