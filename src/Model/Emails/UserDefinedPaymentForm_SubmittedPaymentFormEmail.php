@@ -3,6 +3,7 @@
 namespace SoulDigital\UserformPayments\Model\Emails;
 
 use SilverStripe\Omnipay\Model\Payment;
+use SilverStripe\UserForms\Model\Recipient\EmailRecipient;
 
 /**
  * Email that gets sent to the people listed in the Email Recipients when a
@@ -10,7 +11,7 @@ use SilverStripe\Omnipay\Model\Payment;
  *
  * @package userforms
  */
-class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends UserFormRecipientEmail
+class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends EmailRecipient
 {
     protected $ss_template = "SubmittedPaymentFormEmail";
 

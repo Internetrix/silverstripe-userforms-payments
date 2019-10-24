@@ -1,6 +1,6 @@
 ---
 Name: userforms-payments
 ---
-UserDefinedForm_EmailRecipient:
+SilverStripe\UserForms\Model\Recipient\EmailRecipient:
   extensions:
     - SoulDigital\UserformPayments\Extensions\UserDefinedPaymentFormEmailRecipientExtension
