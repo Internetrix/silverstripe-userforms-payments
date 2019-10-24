@@ -10,7 +10,7 @@ Adds the ability to make a simple Donation page or similar in SilverStripe, usin
 Make sure you have a payment gateway set up (using the SilverStripe Payments via Omnipay module), then simply add a User Defined Payment Form Page to the CMS.
 
 ## Requirements
-  * SilverStripe 3.1
+  * SilverStripe ^4.4
   * UserForms Module <https://github.com/silverstripe/silverstripe-userforms>
   * SilverStripe Payments via Omnipay <https://github.com/burnbright/silverstripe-omnipay>
 

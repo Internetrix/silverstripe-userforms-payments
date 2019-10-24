@@ -1,100 +1,39 @@
 <?php
 
-/**
- * A UserDefinedForm Page object with extra fields for payments
- *
- * @package userforms-payments
- */
+namespace SoulDigital\UserformPayments\Controllers;
 
+use SilverStripe\Assets\File;
+use SilverStripe\Assets\Upload;
+use SilverStripe\Control\Controller;
+use SilverStripe\Control\HTTP;
+use SilverStripe\Forms\CompositeField;
+use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\Form;
+use SilverStripe\Forms\RequiredFields;
+use SilverStripe\Omnipay\Exception\Exception;
 use SilverStripe\Omnipay\GatewayFieldsFactory;
-use SilverStripe\Omnipay\GatewayInfo;
+use SilverStripe\Omnipay\Model\Message\PurchasedResponse;
+use SilverStripe\Omnipay\Model\Payment;
 use SilverStripe\Omnipay\Service\PurchaseService;
-use SilverStripe\Omnipay\Service\ServiceResponse;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\ORM\ValidationException;
+use SilverStripe\Security\Member;
+use SilverStripe\Security\Security;
+use SilverStripe\UserForms\Control\UserDefinedFormController;
+use SilverStripe\UserForms\Form\UserForm;
+use SoulDigital\UserformPayments\Model\Emails\UserDefinedPaymentForm_SubmittedPaymentFormEmail;
+use SoulDigital\UserformPayments\Model\Submissions\SubmittedPaymentForm;
 
-class UserDefinedPaymentForm extends UserDefinedForm
+class UserDefinedPaymentFormController extends UserDefinedFormController
 {
-    private static $description = 'A user defined form page that accepts payments';
-
-    private static $db = array(
-        "PaymentGateway"         => "Varchar",
-        "PaymentCurrency"        => "Varchar(3)",
-        "PaymentFields_Card"     => "Boolean",
-        "PaymentFields_Billing"  => "Boolean",
-        "PaymentFields_Shipping" => "Boolean",
-        "PaymentFields_Company"  => "Boolean",
-        "PaymentFields_Email"    => "Boolean",
-        "OnErrorMessage"         => "HTMLText",
-    );
-
-    private static $has_one = array(
-        "PaymentAmountField" => "EditableFormField",
-    );
-
-    private static $defaults = array(
-        "PaymentCurrency"   => "AUD",
-        "OnErrorMessage"    => "<p>Sorry, your payment could not be processed. Your credit card has not been charged. Please try again.</p>",
-        "OnCompleteMessage" => "<p>Thank you. Your payment of [amount] has been processed.</p>"
-    );
-
-    public function getCMSFields()
-    {
-        $fields       = parent::getCMSFields();
-        $gateways     = GatewayInfo::getSupportedGateways();
-        $amountfields = $this->Fields()->map("ID", "Title");
-        $fields->addFieldsToTab("Root.Payment",
-            array(
-                DropdownField::create("PaymentAmountFieldID", "Payment Amount Field", $amountfields)->setDescription("This must return a value like 20.00 (no dollar sign)"),
-                new DropdownField("PaymentGateway", "Payment Gateway", $gateways),
-                new TextField("PaymentCurrency", "Payment Currency"),
-                new CheckboxField("PaymentFields_Card", "Show Card Fields"),
-                new CheckboxField("PaymentFields_Billing", "Show Billing Fields"),
-                new CheckboxField("PaymentFields_Shipping", "Show Shipping Fields"),
-                new CheckboxField("PaymentFields_Company", "Show Company Fields"),
-                new CheckboxField("PaymentFields_Email", "Show Email Fields")
-            )
-        );
-
-        // text to show on error
-        $onErrorFieldSet = new CompositeField(
-            $label = new LabelField('OnErrorMessageLabel', _t('UserDefinedForm.ONERRORLABEL', 'Show on error')),
-            $editor = new HtmlEditorField("OnErrorMessage", "", _t('UserDefinedForm.ONERRORMESSAGE', $this->OnErrorMessage))
-        );
-
-        $onErrorFieldSet->addExtraClass('field');
-        $fields->insertAfter($onErrorFieldSet, "OnCompleteMessage");
-
-	    $this->extend('updateUserDefinedPaymentFormCMSFields', $fields);
-
-        return $fields;
-    }
-
-	/**
-	 * @return ArrayList
-	 */
-	public function FilteredEmailRecipients($data = null, $form = null, $status = null)
-	{
-		$recipients = parent::FilteredEmailRecipients($data, $form);
-
-		// @todo - rework in the original logic so extensions can manipulate this recipients list
-		$recipients = $recipients->filterByCallback(function ($item, $list) use ($status) {
-			return $item->SendForStatus($status);
-		});
-
-		return $recipients;
-	}
-}
-
-class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
-{
-
-    private static $allowed_actions = array(
+    private static $allowed_actions = [
         "index",
         "ping",
         "Form",
         "finished",
         "complete",
         "error"
-    );
+    ];
 
     /**
      * Find all the omnipay fields that have been defined for this particular payment page
@@ -103,8 +42,8 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
      */
     private function getPaymentFieldsGroupArray()
     {
-        $fields  = array();
-        $options = array("Card", "Billing", "Shipping", "Company", "Email");
+        $fields  = [];
+        $options = ["Card", "Billing", "Shipping", "Company", "Email"];
 
         foreach ($options as $option) {
             $dbfield = "PaymentFields_" . $option;
@@ -115,22 +54,21 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         return $fields;
     }
 
-	/**
-	 * Get the form for the page. Form can be modified by calling {@link updateForm()}
-	 * on a UserDefinedForm extension.
-	 *
-	 * @return Forms
-	 */
-	public function Form()
-	{
-		$form = UserForm::create($this);
-		$form->setFields($this->getFormFields($form));
-		$this->generateConditionalJavascript();
-		return $form;
-	}
+    /**
+     * Get the form for the page. Form can be modified by calling {@link updateForm()}
+     * on a UserDefinedForm extension.
+     *
+     * @return Form
+     */
+    public function Form()
+    {
+        $form = UserForm::create($this);
+        $form->setFields($this->getFormFields($form));
+        $this->generateConditionalJavascript();
+        return $form;
+    }
 
-
-	/**
+    /**
      * Combine all the parent UserDefinedForm fields and the omnipay fields
      *
      * @return FieldList
@@ -191,11 +129,13 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
      */
     public function process($data, $form)
     {
-        Session::set("FormInfo.{$form->FormName()}.data", $data);
-        Session::clear("FormInfo.{$form->FormName()}.errors");
+        $session = $this->getRequest()->getSession();
+        $session->set("FormInfo.{$form->FormName()}.data", $data);
+        $session->clear("FormInfo.{$form->FormName()}.errors");
 
         // if there are no errors, create the payment
-        $submittedForm                = Object::create('SubmittedPaymentForm');
+//        $submittedForm                = Object::create('SubmittedPaymentForm');
+        $submittedForm                = SubmittedPaymentForm::create();
         $submittedForm->SubmittedByID = ($id = Member::currentUserID()) ? $id : 0;
         $submittedForm->ParentID      = $this->ID;
 
@@ -204,7 +144,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
             $submittedForm->write();
         }
 
-        $attachments = array();
+        $attachments = [];
 
         $submittedFields = new ArrayList();
 
@@ -278,21 +218,21 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
 
         // request payment
         $payment = Payment::create()->init($this->data()->PaymentGateway, $amount, $currency);
-	    $payment->setSuccessUrl($this->Link('finished') . $referrer);
-	    $payment->setFailureUrl($this->Link('finished') . $referrer);
+        $payment->setSuccessUrl($this->Link('finished') . $referrer);
+        $payment->setFailureUrl($this->Link('finished') . $referrer);
 
         $payment->write();
 
         $service = PurchaseService::create($payment);
 
-	    // Initiate payment, get the result back
-	    try {
-		    $serviceResponse = $service->initiate($postdata);
-	    } catch (SilverStripe\Omnipay\Exception\Exception $ex) {
-		    // error out when an exception occurs
-		    $this->error($ex->getMessage());
-		    return null;
-	    }
+        // Initiate payment, get the result back
+        try {
+            $serviceResponse = $service->initiate($postdata);
+        } catch (Exception $ex) {
+            // error out when an exception occurs
+            $this->error($ex->getMessage());
+            return null;
+        }
 
         // save payment to order
         $submittedForm->PaymentID = $payment->ID;
@@ -307,26 +247,26 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
 
         $submittedForm->extend('updateAfterProcess');
 
-        Session::clear("FormInfo.{$form->FormName()}.errors");
-        Session::clear("FormInfo.{$form->FormName()}.data");
+        $session->clear("FormInfo.{$form->FormName()}.errors");
+        $session->clear("FormInfo.{$form->FormName()}.data");
 
 
         // set a session variable from the security ID to stop people accessing the finished method directly
         if (isset($data['SecurityID'])) {
-            Session::set('FormProcessed', $data['SecurityID']);
+            $session->set('FormProcessed', $data['SecurityID']);
         } else {
             // if the form has had tokens disabled we still need to set FormProcessed
             // to allow us to get through the finshed method
             if (!$this->Form()->getSecurityToken()->isEnabled()) {
                 $randNum  = rand(1, 1000);
                 $randHash = md5($randNum);
-                Session::set('FormProcessed', $randHash);
-                Session::set('FormProcessedNum', $randNum);
+                $session->set('FormProcessed', $randHash);
+                $session->set('FormProcessedNum', $randNum);
             }
         }
 
         if (!$this->DisableSaveSubmissions) {
-            Session::set('userformssubmission' . $this->ID, $submittedForm->ID);
+            $session->set('userformssubmission' . $this->ID, $submittedForm->ID);
         }
 //die();
         return $serviceResponse->redirectOrRespond();
@@ -338,7 +278,9 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
      */
     public function finished()
     {
-        $submission = Session::get('userformssubmission' . $this->ID);
+        $session = $this->getRequest()->getSession();
+
+        $submission = $session->get('userformssubmission' . $this->ID);
         $amountnice = '$0';
 
         if ($submission) {
@@ -350,7 +292,7 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
                 $payment_status = $payment->Status;
 
                 // @todo get $attachments from submission
-                $attachments = array();
+                $attachments = [];
 
                 if ($recipients = $this->FilteredEmailRecipients(null, null, $payment_status)) {
                     $this->SendEmailsToRecipients($recipients, $attachments, $submittedFields, $payment);
@@ -360,38 +302,35 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
 
         $referrer = isset($_GET['referrer']) ? urldecode($_GET['referrer']) : null;
 
-        $formProcessed = Session::get('FormProcessed');
+        $formProcessed = $session->get('FormProcessed');
         if (!isset($formProcessed)) {
             return $this->redirect($this->Link() . $referrer);
         } else {
-            $securityID = Session::get('SecurityID');
+            $securityID = $session->get('SecurityID');
             // make sure the session matches the SecurityID and is not left over from another form
             if ($formProcessed != $securityID) {
                 // they may have disabled tokens on the form
-                $securityID = md5(Session::get('FormProcessedNum'));
+                $securityID = md5($session->get('FormProcessedNum'));
                 if ($formProcessed != $securityID) {
                     return $this->redirect($this->Link() . $referrer);
                 }
             }
         }
         // remove the session variable as we do not want it to be re-used
-        Session::clear('FormProcessed');
-	    Session::clear('userformssubmission' . $this->ID);
+        $session->clear('FormProcessed');
+        $session->clear('userformssubmission' . $this->ID);
         $successmessage = str_replace("[amount]", $amountnice, $this->data()->OnCompleteMessage);
-        return $this->customise(array(
-            'Content' => $this->customise(array(
+        return $this->customise([
+            'Content' => $this->customise([
                 'Submission'       => $submission,
                 'Link'             => $referrer,
                 'OnSuccessMessage' => $successmessage,
                 'AmountNice'       => $amountnice
-            ))->renderWith('ReceivedPaymentFormSubmission'),
+            ])->renderWith('ReceivedPaymentFormSubmission'),
             'Form'      => ($payment_status=="Captured")?'':$this->Form(),
-	        'IsFinished'  => true
-        ));
+            'IsFinished'  => true
+        ]);
     }
-
-
-
 
     /**
      * We need to offset the sending of emails so we can change the content based on the payment status
@@ -405,10 +344,15 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
         $email            = new UserDefinedPaymentForm_SubmittedPaymentFormEmail($submittedFields);
         $email->PaymentID = $payment->ID;
         $receipt_number   = "";
-        if($purchased_response = PurchasedResponse::get()->filter("PaymentID", $payment->ID)->first()){
+        if ($purchased_response = PurchasedResponse::get()->filter("PaymentID", $payment->ID)->first()) {
             $receipt_number = $purchased_response->Reference;
         }
-        $emailData        = array("Sender"=>Member::currentUser(), "Fields"=>$submittedFields, "Payment" => $payment, "ReceiptNumber" => $receipt_number);
+        $emailData        = [
+            "Sender" => Security::getCurrentUser(),
+            "Fields" => $submittedFields,
+            "Payment" => $payment,
+            "ReceiptNumber" => $receipt_number
+        ];
 
         if ($attachments) {
             foreach ($attachments as $file) {
@@ -476,45 +420,5 @@ class UserDefinedPaymentForm_Controller extends UserDefinedForm_Controller
                 $email->send();
             }
         }
-    }
-
-}
-
-
-/**
- * Email that gets sent to the people listed in the Email Recipients when a
- * submission is made.
- *
- * @package userforms
- */
-class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends UserFormRecipientEmail
-{
-
-    protected $ss_template = "SubmittedPaymentFormEmail";
-
-    /*
-    public function Body()
-    {
-        return str_replace("[amount]", $this->PaymentAmount(), $this->body);
-    }
-    */
-
-    public function Payment()
-    {
-        return Payment::get()->byID($this->PaymentID);
-    }
-
-    public function PaymentAmount()
-    {
-        if ($payment = $this->Payment())
-            return "$" . substr($payment->getAmount(), 0, -2);
-        return "$0";
-    }
-
-    public function PaymentStatus()
-    {
-        if ($payment = $this->Payment())
-            return $payment->Status;
-        return "Error";
     }
 }

@@ -3,4 +3,4 @@ Name: userforms-payments
 ---
 UserDefinedForm_EmailRecipient:
   extensions:
-    - UserDefinedPaymentFormEmailRecipientExtension
+    - SoulDigital\UserformPayments\Extensions\UserDefinedPaymentFormEmailRecipientExtension

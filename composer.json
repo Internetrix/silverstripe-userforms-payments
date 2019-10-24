@@ -1,8 +1,13 @@
 {
     "name": "souldigital/silverstripe-userforms-payments",
     "description": "UserForms Payments enables CMS users to create dynamic forms that accept payment via a drag and drop interface and without getting involved in any PHP code",
-    "type": "silverstripe-module",
-    "keywords": ["silverstripe", "userforms", "omnipay"],
+    "type": "silverstripe-vendormodule",
+    "homepage": "https://github.com/Internetrix/silverstripe-userforms-payments",
+    "keywords": [
+        "silverstripe",
+        "userforms",
+        "omnipay"
+    ],
     "authors": [
         {
             "name": "Soul Digital",
@@ -14,7 +19,37 @@
         }
     ],
     "require": {
-        "silverstripe/userforms": ">=4.4.0",
-		"silverstripe/silverstripe-omnipay" : "^2.1"
-    }
+        "silverstripe/recipe-core": "^4.4",
+        "silverstripe/recipe-cms": "^4.4",
+        "silverstripe/userforms": "^5.4",
+        "silverstripe/silverstripe-omnipay": "dev-master#d45a57ebef5782e262dd96a3c0fc99283ba912c8",
+        "php-http/guzzle6-adapter": "dev-master"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.7"
+    },
+    "extra": {
+        "installer-name": "userform-payments",
+        "project-files-installed": [
+            "app/.htaccess",
+            "app/_config.php",
+            "app/_config/mysite.yml",
+            "app/src/Page.php",
+            "app/src/PageController.php"
+        ],
+        "public-files-installed": [
+            ".htaccess",
+            "index.php",
+            "install-frameworkmissing.html",
+            "install.php",
+            "web.config"
+        ]
+    },
+    "autoload": {
+        "psr-4": {
+            "SoulDigital\\UserformPayments\\": "src/"
+        }
+    },
+    "prefer-stable": true,
+    "minimum-stability": "dev"
 }
