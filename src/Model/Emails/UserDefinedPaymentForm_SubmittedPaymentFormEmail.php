@@ -13,7 +13,7 @@ use SilverStripe\UserForms\Model\Recipient\EmailRecipient;
  */
 class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends EmailRecipient
 {
-    protected $ss_template = "SubmittedPaymentFormEmail";
+    protected $ss_template = "email/SubmittedPaymentFormEmail";
 
     /*
     public function Body()
