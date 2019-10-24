@@ -1,0 +1,5 @@
+SilverStripe\ORM\DatabaseAdmin:
+  classname_value_remapping:
+    UserDefinedPaymentForm: SoulDigital\UserformPayments\Pages\UserDefinedPaymentForm
+    SubmittedPaymentForm: SoulDigital\UserformPayments\Model\Submissions\SubmittedPaymentForm
+    UserDefinedPaymentForm_SubmittedPaymentFormEmail: SoulDigital\UserformPayments\Model\Emails\UserDefinedPaymentForm_SubmittedPaymentFormEmail
