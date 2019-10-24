@@ -15,6 +15,8 @@ class UserDefinedPaymentForm_SubmittedPaymentFormEmail extends EmailRecipient
 {
     protected $ss_template = "email/SubmittedPaymentFormEmail";
 
+    private static $table_name = 'UserDefinedPaymentForm_SubmittedPaymentFormEmail';
+
     /*
     public function Body()
     {

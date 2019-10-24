@@ -22,6 +22,8 @@ class UserDefinedPaymentForm extends UserDefinedForm
 {
     private static $description = 'A user defined form page that accepts payments';
 
+    private static $table_name = 'UserDefinedPaymentForm';
+
     private static $db = [
         "PaymentGateway"         => "Varchar",
         "PaymentCurrency"        => "Varchar(3)",

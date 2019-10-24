@@ -12,6 +12,8 @@ use SilverStripe\UserForms\Model\Submission\SubmittedForm;
  */
 class SubmittedPaymentForm extends SubmittedForm
 {
+    private static $table_name = 'SubmittedPaymentForm';
+
     private static $has_one = [
         "Payment" => Payment::class
     ];
